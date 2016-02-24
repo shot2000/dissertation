@@ -1,0 +1,70 @@
+\documentclass[letterpaper, 12pt]{article}
+\usepackage[top=1in,left=1in,right=1in,bottom=1in]{geometry}
+\usepackage{graphicx}
+
+\begin{document}
+
+% R code chunk, loads packages
+<<echo=false, results=hide>>=
+   rm(list=ls(all=TRUE))       # Remove all objects
+   library(xtable)
+@ 
+
+% Latex code chunk
+\section*{Motor Trend Car Test Data}
+The \texttt{mtcars} dataset consists of \Sexpr{nrow(mtcars)} automobiles and 
+\Sexpr{ncol(mtcars)} variables from a 1974 \textit{Motor Trend} magazine. 
+Table \ref{tab:sum.stat} gives summary statistics for miles per gallon (MPG)
+by transmission type.
+
+% R Code for Latex table
+<<echo=false, results=tex>>=
+   sum.mpg <- with(mtcars, aggregate(mpg, list(am), FUN=function(x) c(Mean=mean(x), SD=sd(x))))[,-1]
+   rownames(sum.mpg) = c("Automatic", "Manual")
+   xtable(sum.mpg, caption="Mean and standard deviation of MPG by transmission type", 
+	    label="tab:sum.stat",
+	    align=c("l", "c", "c"))
+@
+
+% For the remainder of the file the default value of echo is false
+\SweaveOpts{echo=false}
+
+Figure \ref{fig:mpg} plots MPG versus weight by transmission type.
+% To include a figure replace \includegraphics with <<fig=true>>=...@
+\begin{figure}[h]
+  \centering
+<<fig=TRUE,width=8,height=6>>=
+   plot(mpg~wt, data=mtcars, pch=ifelse(am==1, "M", "A"),
+        main="Miles per Gallon by Weight and Transmission Type",
+	  xlab="Weight (lb/1000)",
+ 	  ylab="MPG")
+   legend("topright", c("Manual", "Automatic"), pch=c("M", "A"), title="Transmission", bty="n")
+@  
+  \caption{MPG versus weight by transmission}
+  \label{fig:mpg}
+\end{figure}
+% Note: unlike plot() which does not return anything, xyplot() returns an 
+% object of class trellis. So to include an xyplot() need to use print() as 
+% well, print(xyplot(...))
+
+The linear regression model of MPG by weight and transmission type is fitted using the following
+R commands,
+<<echo=true, results=hide>>=
+   fit <- lm(mpg~wt+am, data=mtcars)
+   summary(fit)
+@
+
+Below is the output produced from calling \texttt{summary(fit)},
+<<>>=
+   summary(fit)
+@
+
+For an alternative output of the regression results use \texttt{xtable()},
+<<echo=true, results=tex>>=
+   xtable(fit, caption="Linear regression results")
+@
+
+For every extra 1000 lb a car weights, the average change in fuel consumption is 
+\Sexpr{round(summary(fit)$coef[2,1], 2)} MPG.
+
+\end{document}

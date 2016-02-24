@@ -1,0 +1,5 @@
+map <- readShapePoly("world",IDvar="MAP_CCODE",proj4string=CRS("+proj=eqc +lon_0=90w")) 
+merged <- merge(x=m_ccode, y=polity, by.x="CCODE", by.y="ccode", all.x=T, all.y=F)
+merged <- merged[order(merged$MAP_CCODE),]
+map2 <- spCbind(map,merged)
+map3 <- spCbind(map2,merged)

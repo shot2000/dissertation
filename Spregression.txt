@@ -1,0 +1,391 @@
+## Clear the workspace
+
+rm(list=ls())
+
+
+## Install packages
+
+install.packages("maps")
+install.packages("maptools")
+install.packages("sp")
+install.packages("spdep")
+install.packages("gstat")
+install.packages("splancs")
+install.packages("spatstat")
+install.packages("lattice")
+install.packages("pgirmess")
+install.packages("RColorBrewer")
+install.packages("classInt")
+install.packages("spgwr")
+install.packages("rgdal")
+
+## Load spatial packages
+
+library(maps)         ## Projections
+library(maptools)     ## Data management
+library(sp)           ## Data management
+library(spdep)        ## Spatial autocorrelation
+library(gstat)        ## Geostatistics
+library(splancs)      ## Kernel Density
+library(spatstat)     ## Geostatistics
+library(pgirmess)     ## Spatial autocorrelation
+library(RColorBrewer) ## Visualization
+library(classInt)     ## Class intervals
+library(spgwr)        ## GWR
+library(RANN)  
+library(rgdal)  
+
+setwd("H:/00-Dissertation/02_Preliminary_Research/04-Regression_Analysis/R_Spatial_Analysis")
+## load the shapefile
+taz<-readOGR(".","TAZ_CarbEM4Regression0514")  
+#save(taz,file="Datasets.RData")
+load("Datasets.RData")
+
+data <- taz
+names(data)
+
+# CHange Column names
+names(data )[6]<-paste("AT")
+names(data )[8]<-paste("TOTAL_HH")
+names(data )[9]<-paste("AVGWK") 
+names(data )[10]<-paste("AVGPER")
+names(data )[11]<-paste("AVGAUTO")
+names(data )[19]<-paste("EMP_L") 
+names(data )[20]<-paste("EMP_M") 
+names(data )[21]<-paste("EMP_H") 
+names(data )[23]<-paste("POP") 
+########
+## Linear Model
+########
+
+mod.lm <- lm(CarEMTAZ ~ ACRES + AT + POP + TOTAL_HH + TOTAL_EMPL + 
+    POP_DENSIT + EMP_DENSIT + TOTAL_AUTO + EMP_M + AVGWK + AVGAUTO + 
+    Avg_CarbEM + Avg_TRIPSP, data=data)
+summary(mod.lm)
+
+Call:
+lm(formula = CarEMTAZ ~ ACRES + AT + POP + TOTAL_HH + TOTAL_EMPL + 
+    POP_DENSIT + EMP_DENSIT + TOTAL_AUTO + EMP_M + AVGWK + AVGAUTO + 
+    Avg_CarbEM + Avg_TRIPSP, data = data)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-2.05135 -0.25754 -0.03712  0.21129  2.66938 
+
+Coefficients:
+              Estimate Std. Error t value Pr(>|t|)    
+(Intercept) -1.606e-01  1.083e-01  -1.482 0.138675    
+ACRES        7.610e-05  4.484e-05   1.697 0.090160 .  
+AT           1.868e-01  4.710e-02   3.965 8.10e-05 ***
+POP          4.565e-04  1.006e-04   4.535 6.80e-06 ***
+TOTAL_HH     4.199e-04  2.174e-04   1.932 0.053826 .  
+TOTAL_EMPL  -3.776e-05  2.484e-05  -1.520 0.128934    
+POP_DENSIT  -2.128e-02  4.870e-03  -4.369 1.44e-05 ***
+EMP_DENSIT   4.214e-04  2.838e-04   1.485 0.138110    
+TOTAL_AUTO   4.961e-04  1.040e-04   4.772 2.24e-06 ***
+EMP_M        2.396e-01  7.069e-02   3.390 0.000740 ***
+AVGWK        1.583e-01  8.502e-02   1.862 0.062971 .  
+AVGAUTO     -1.940e-01  7.480e-02  -2.594 0.009688 ** 
+Avg_CarbEM  -7.543e+01  2.106e+01  -3.582 0.000365 ***
+Avg_TRIPSP   1.989e-02  3.558e-03   5.589 3.32e-08 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1 
+
+Residual standard error: 0.5001 on 679 degrees of freedom
+Multiple R-squared: 0.8002,	Adjusted R-squared: 0.7964 
+F-statistic: 209.2 on 13 and 679 DF,  p-value: < 2.2e-16 
+
+###########
+AIC(mod.lm)
+[1] 1022.084
+##getting BIC
+bic=AIC(mod.lm,k = log(length(data)))
+##Extract Log-Likelihood from an lm Object
+logLik(mod.lm)
+'log Lik.' -496.0418 (df=15)
+## Plot residuals
+
+res <- mod.lm$residuals
+
+res.palette <- colorRampPalette(c("red","orange","white", "lightgreen","green"), space = "rgb")
+pal <- res.palette(5)
+
+classes_fx <- classIntervals(res, n=5, style="fixed", fixedBreaks=c(-3,-2,-1,1,2,3), rtimes = 1)
+cols <- findColours(classes_fx,pal)
+
+par(mar=rep(0,4))
+plot(data,col=cols, main="Residuals from OLS Model", pretty=T, border="grey")
+legend(x="bottom",cex=1.5,fill=attr(cols,"palette"),bty="n",legend=names(attr(cols, "table")),title="Residuals from OLS Model",ncol=5)
+
+
+
+dev.off()
+
+## Residual Autocorrelation
+# read the spatial weight file
+tazgal <- read.gal("TAZ_CarbEM4Regression0514.gal",override.id=TRUE)
+attributes (tazgal)
+# Creating a spatial weights list from a gal file
+tazw <- nb2listw(tazgal)
+moran.test(res, listw=tazw, zero.policy=T)
+
+# the results
+#Moran's I test under randomisation
+
+data:  res  
+weights: tazw  
+ 
+Moran I statistic standard deviate = 0.11, p-value = 0.4562
+alternative hypothesis: greater 
+sample estimates:
+Moran I statistic       Expectation          Variance 
+     0.0010859147     -0.0014450867      0.0005292909 
+	
+########
+## SAR Model (WARNING: This takes a while to run)
+########
+
+mod.sar <- lagsarlm(CarEMTAZ ~ ACRES + AT + POP + TOTAL_HH + TOTAL_EMPL +
++ POP_DENSIT + EMP_DENSIT + TOTAL_AUTO + EMP_M + AVGWK + AVGAUTO +
++ Avg_CarbEM + Avg_TRIPSP, data = data, listw=tazw , zero.policy=T, tol.solve=2e-14)
+summary(mod.sar)
+
+##results
+
+Call:lagsarlm(formula = CarEMTAZ ~ ACRES + AT + POP + TOTAL_HH + TOTAL_EMPL + 
+    POP_DENSIT + EMP_DENSIT + TOTAL_AUTO + EMP_M + AVGWK + AVGAUTO + 
+    Avg_CarbEM + Avg_TRIPSP, data = data, listw = tazw, zero.policy = T, 
+    tol.solve = 2e-14)
+
+Residuals:
+      Min        1Q    Median        3Q       Max 
+-2.031904 -0.250650 -0.034679  0.206391  2.695469 
+
+Type: lag 
+Coefficients: (asymptotic standard errors) 
+               Estimate  Std. Error z value  Pr(>|z|)
+(Intercept) -1.3751e-01  1.0741e-01 -1.2803 0.2004344
+ACRES        5.6604e-05  4.4711e-05  1.2660 0.2055115
+AT           1.9277e-01  4.6517e-02  4.1440 3.414e-05
+POP          4.5876e-04  9.9445e-05  4.6132 3.966e-06
+TOTAL_HH     4.6802e-04  2.1592e-04  2.1676 0.0301884
+TOTAL_EMPL  -4.2244e-05  2.4621e-05 -1.7158 0.0861948
+POP_DENSIT  -2.1807e-02  4.8179e-03 -4.5263 6.004e-06
+EMP_DENSIT   3.7842e-04  2.8109e-04  1.3462 0.1782265
+TOTAL_AUTO   4.7792e-04  1.0364e-04  4.6112 4.004e-06
+EMP_M        2.3586e-01  6.9770e-02  3.3805 0.0007236
+AVGWK        1.6982e-01  8.4205e-02  2.0168 0.0437169
+AVGAUTO     -1.6245e-01  7.5533e-02 -2.1508 0.0314955
+Avg_CarbEM  -7.5381e+01  2.0780e+01 -3.6276 0.0002861
+Avg_TRIPSP   2.0156e-02  3.5120e-03  5.7392 9.514e-09
+
+Rho: -0.065259, LR test value: 3.8462, p-value: 0.049858
+Asymptotic standard error: 0.03343
+    z-value: -1.9521, p-value: 0.050927
+Wald statistic: 3.8107, p-value: 0.050927
+
+Log likelihood: -494.1186 for lag model
+ML residual variance (sigma squared): 0.24351, (sigma: 0.49347)
+Number of observations: 693 
+Number of parameters estimated: 16 
+AIC: 1020.2, (AIC for lm: 1022.1)
+LM test for residual autocorrelation
+test value: 1.31, p-value: 0.2524
+
+###########residual
+
+res <- mod.sar$residuals
+
+classes_fx <- classIntervals(res, n=5, style="fixed", fixedBreaks=c(-3,-2,-1,1,2,3), rtimes = 1)
+res.palette <- colorRampPalette(c("red","orange","white", "lightgreen","green"), space = "rgb")
+pal <- res.palette(5)
+cols <- findColours(classes_fx,pal)
+
+par(mar=rep(0,4))
+plot(data,col=cols, border="grey",pretty=T)
+legend(x="bottom",cex=1.5,fill=attr(cols,"palette"),bty="n",legend=names(attr(cols, "table")),title="Residuals from SAR Model",ncol=5)
+
+
+
+dev.off()
+
+## Residual Autocorrelation
+
+moran.test(res, listw=tazw, zero.policy=T)
+#Moran's I test under randomisation
+
+data:  res  
+weights: tazw  
+ 
+Moran I statistic standard deviate = 1.0418, p-value = 0.1488
+alternative hypothesis: greater 
+sample estimates:
+Moran I statistic       Expectation          Variance 
+     0.0225214042     -0.0014450867      0.0005292397 
+	 
+
+
+########
+## SEM Model (WARNING: This takes a while to run)
+########
+
+
+mod.sem <- errorsarlm(CarEMTAZ ~ ACRES + AT + POP + TOTAL_HH + TOTAL_EMPL + 
+    POP_DENSIT + EMP_DENSIT + TOTAL_AUTO + EMP_M + AVGWK + AVGAUTO + 
+    Avg_CarbEM + Avg_TRIPSP, data = data, listw = tazw, zero.policy=T, tol.solve=1e-15)
+summary(mod.sem)
+
+Call:errorsarlm(formula = CarEMTAZ ~ ACRES + AT + POP + TOTAL_HH + 
+    TOTAL_EMPL + POP_DENSIT + EMP_DENSIT + TOTAL_AUTO + EMP_M + 
+    AVGWK + AVGAUTO + Avg_CarbEM + Avg_TRIPSP, data = data, listw = tazw, 
+    zero.policy = T, tol.solve = 1e-15)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-2.05138 -0.25715 -0.03673  0.21124  2.66950 
+
+Type: error 
+Coefficients: (asymptotic standard errors) 
+               Estimate  Std. Error z value  Pr(>|z|)
+(Intercept) -1.6075e-01  1.0734e-01 -1.4976 0.1342316
+ACRES        7.6827e-05  4.4454e-05  1.7282 0.0839488
+AT           1.8654e-01  4.6688e-02  3.9955 6.455e-05
+POP          4.5731e-04  9.9709e-05  4.5864 4.509e-06
+TOTAL_HH     4.1992e-04  2.1537e-04  1.9498 0.0512003
+TOTAL_EMPL  -3.7769e-05  2.4594e-05 -1.5357 0.1246102
+POP_DENSIT  -2.1299e-02  4.8254e-03 -4.4139 1.015e-05
+EMP_DENSIT   4.2090e-04  2.8127e-04  1.4965 0.1345346
+TOTAL_AUTO   4.9510e-04  1.0299e-04  4.8074 1.529e-06
+EMP_M        2.3961e-01  6.9998e-02  3.4230 0.0006192
+AVGWK        1.5857e-01  8.4201e-02  1.8832 0.0596732
+AVGAUTO     -1.9404e-01  7.4093e-02 -2.6189 0.0088227
+Avg_CarbEM  -7.5409e+01  2.0845e+01 -3.6176 0.0002974
+Avg_TRIPSP   1.9876e-02  3.5225e-03  5.6424 1.677e-08
+
+Lambda: 0.0032987, LR test value: 0.0024828, p-value: 0.96026
+Asymptotic standard error: 0.062279
+    z-value: 0.052967, p-value: 0.95776
+Wald statistic: 0.0028055, p-value: 0.95776
+
+Log likelihood: -496.0405 for error model
+ML residual variance (sigma squared): 0.24505, (sigma: 0.49502)
+Number of observations: 693 
+Number of parameters estimated: 16 
+AIC: 1024.1, (AIC for lm: 1022.1)
+
+#################################
+res <- mod.sem$residuals
+
+classes_fx <- classIntervals(res, n=5, style="fixed", fixedBreaks=c(-3,-2,-1,1,2,3), rtimes = 1)
+cols <- findColours(classes_fx,pal)
+
+## par(mar=rep(0,4))
+plot(data,col=cols, border="grey",pretty=T)
+legend(x="bottom",cex=1.5,fill=attr(cols,"palette"),bty="n",legend=names(attr(cols, "table")),title="Residuals from SEM Model",ncol=5)
+
+
+## Residual Autocorrelation
+
+moran.test(res, listw=tazw, zero.policy=T)
+# Moran's I test under randomisation
+
+data:  res  
+weights: tazw  
+ 
+Moran I statistic standard deviate = 0.0639, p-value = 0.4745
+alternative hypothesis: greater 
+sample estimates:
+Moran I statistic       Expectation          Variance 
+     2.511625e-05     -1.445087e-03      5.292904e-04 
+
+
+########
+## SDM Model (WARNING: This takes a while to run)
+########
+
+
+mod.sdm <- lagsarlm(CarEMTAZ ~ ACRES + AT + POP + TOTAL_HH + TOTAL_EMPL + 
+    POP_DENSIT + EMP_DENSIT + TOTAL_AUTO + EMP_M + AVGWK + AVGAUTO + 
+    Avg_CarbEM + Avg_TRIPSP, data = data, listw = tazw, zero.policy=T, type="mixed", tol.solve=1.47932e-15)
+summary(mod.sdm)
+
+Call:lagsarlm(formula = CarEMTAZ ~ ACRES + AT + POP + TOTAL_HH + TOTAL_EMPL + 
+    POP_DENSIT + EMP_DENSIT + TOTAL_AUTO + EMP_M + AVGWK + AVGAUTO + 
+    Avg_CarbEM + Avg_TRIPSP, data = data, listw = tazw, type = "mixed", 
+    zero.policy = T, tol.solve = 1.47932e-15)
+
+Residuals:
+      Min        1Q    Median        3Q       Max 
+-1.954091 -0.263275 -0.047956  0.217257  2.794910 
+
+Type: mixed 
+Coefficients: (asymptotic standard errors) 
+                  Estimate  Std. Error z value  Pr(>|z|)
+(Intercept)    -6.3735e-02  1.7691e-01 -0.3603 0.7186379
+ACRES           2.1679e-04  5.6788e-05  3.8176 0.0001347
+AT              3.0049e-01  8.3073e-02  3.6172 0.0002978
+POP             5.5010e-04  1.0738e-04  5.1227 3.011e-07
+TOTAL_HH        6.0516e-04  2.3397e-04  2.5865 0.0096956
+TOTAL_EMPL     -5.0795e-05  2.5444e-05 -1.9964 0.0458939
+POP_DENSIT     -2.5502e-02  5.5321e-03 -4.6099 4.029e-06
+EMP_DENSIT      3.7456e-04  3.4305e-04  1.0918 0.2749051
+TOTAL_AUTO      2.5572e-04  1.1208e-04  2.2816 0.0225122
+EMP_M           1.8658e-01  7.1481e-02  2.6102 0.0090493
+AVGWK           1.9110e-01  8.8355e-02  2.1629 0.0305500
+AVGAUTO        -8.0334e-02  8.7730e-02 -0.9157 0.3598300
+Avg_CarbEM     -7.5783e+01  2.0472e+01 -3.7019 0.0002140
+Avg_TRIPSP      1.9839e-02  3.4686e-03  5.7195 1.068e-08
+lag.ACRES      -3.3558e-04  7.7041e-05 -4.3558 1.326e-05
+lag.AT         -2.8099e-02  1.1030e-01 -0.2547 0.7989266
+lag.POP        -4.0606e-04  1.8026e-04 -2.2527 0.0242809
+lag.TOTAL_HH   -1.7116e-04  3.9631e-04 -0.4319 0.6658255
+lag.TOTAL_EMPL -1.5352e-05  4.9389e-05 -0.3109 0.7559136
+lag.POP_DENSIT  1.5029e-02  9.7010e-03  1.5492 0.1213218
+lag.EMP_DENSIT  2.5217e-04  5.6187e-04  0.4488 0.6535716
+lag.TOTAL_AUTO  6.1609e-04  2.0102e-04  3.0649 0.0021775
+lag.EMP_M      -9.2180e-03  1.4680e-01 -0.0628 0.9499302
+lag.AVGWK      -1.2454e-01  1.7357e-01 -0.7175 0.4730560
+lag.AVGAUTO    -1.0240e-01  1.5746e-01 -0.6503 0.5154900
+lag.Avg_CarbEM -4.7620e+01  4.8346e+01 -0.9850 0.3246325
+lag.Avg_TRIPSP  1.0390e-02  8.0088e-03  1.2973 0.1945310
+
+Rho: -0.048167, LR test value: 0.60202, p-value: 0.43781
+Asymptotic standard error: 0.062502
+    z-value: -0.77065, p-value: 0.44091
+Wald statistic: 0.59391, p-value: 0.44091
+
+Log likelihood: -474.5257 for mixed model
+ML residual variance (sigma squared): 0.2302, (sigma: 0.47979)
+Number of observations: 693 
+Number of parameters estimated: 29 
+AIC: 1007.1, (AIC for lm: 1005.7)
+LM test for residual autocorrelation
+test value: 10.52, p-value: 0.0011811
+
+#############################################
+
+res <- mod.sdm$residuals
+
+classes_fx <- classIntervals(res, n=5, style="fixed", fixedBreaks=c(-3,-2,-1,1,2,3), rtimes = 1)
+cols <- findColours(classes_fx,pal)
+
+## par(mar=rep(0,4))
+plot(data,col=cols, border="grey",pretty=T)
+legend(x="bottom",cex=1.5,fill=attr(cols,"palette"),bty="n",legend=names(attr(cols, "table")),title="Residuals from SDM Model",ncol=5)
+
+dev.off()
+## Residual Autocorrelation
+
+moran.test(res, listw=tazw, zero.policy=T)
+# 	Moran's I test under randomisation
+
+data:  res  
+weights: tazw  
+ 
+Moran I statistic standard deviate = -0.422, p-value = 0.6635
+alternative hypothesis: greater 
+sample estimates:
+Moran I statistic       Expectation          Variance 
+    -0.0111517507     -0.0014450867      0.0005290678 
+
+
